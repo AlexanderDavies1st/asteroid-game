@@ -1,0 +1,86 @@
+/* Main */
+body {
+    margin: 0;
+    background: #222;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+#game-container {
+    position: relative;
+    width: min(800px, 100vw);
+    height: min(800px, 100vh);
+}
+
+canvas {
+    border: 5px solid white;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+html, body {
+    margin: 0;
+    overflow: hidden;
+}
+h2 {
+    color: white;
+    font-size: 50px;
+}
+
+#upgrade-menu,
+#death-screen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    text-align: center;
+}
+
+#upgrade-menu {
+    width: 80%;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.75);
+}
+
+#upgrade-options {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+button {
+    /* Remove Old Styling */
+    background: none;
+    border: none;
+    outline: none;
+
+    /* Add New */
+    padding: 8px 15px;
+    display: inline-block;
+
+    background-color:#73a1d0;
+    color:#fff;
+    font-size: 12px;
+    font-weight:600;
+
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+    font-size: 1.25rem;
+    padding: 0.75em 1.5em;
+}
+button:hover {
+    background-color:#73a1d0;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}

@@ -95,6 +95,10 @@ export function openUpgradeMenu(player, onUpgradeSelected) {
     const availableUpgrades = upgrades.filter(
         (upgrade) => getUpgradeLevel(player, upgrade) < upgrade.maxLevel
     );
+    if (availableUpgrades.length == 0) {
+        menu.hidden = true;
+        onUpgradeSelected();
+    }
 
     for (const upgrade of getRandomUpgrades(availableUpgrades, Math.min(3, availableUpgrades.length))) {
         const button = document.createElement("button");

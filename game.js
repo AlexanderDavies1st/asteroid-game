@@ -88,7 +88,7 @@ function update(deltaTime) {
     for (let x of Enemies) {
         for (let index = PlayerBullets.length - 1; index >= 0; index--) {
             let b = PlayerBullets[index];
-            if (b.getDistanceToObject(x) < x.size) {
+            if (b.getDistanceToObject(x) < x.size + b.size) {
                 x.health -= b.damage;
                 PlayerBullets.splice(index, 1);
             }
@@ -134,7 +134,7 @@ function update(deltaTime) {
     // Player Damage
     for (let index = EnemyBullets.length - 1; index >= 0; index--) {
         const bullet = EnemyBullets[index];
-        if (bullet.getDistanceToObject(player) < player.size) {
+        if (bullet.getDistanceToObject(player) < player.size + bullet.size) {
             player.health -= bullet.damage;
             EnemyBullets.splice(index, 1);
         }

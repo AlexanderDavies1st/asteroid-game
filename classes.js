@@ -18,6 +18,8 @@ export class Player {
         this.expSpeed = 30;
         this.expRange = 150;
         this.expCatchRange = radius;
+        this.abilities = new Set();
+        this.abilityCooldowns = {};
     }
 
     update(deltaTime, keys) {
@@ -29,13 +31,19 @@ export class Player {
         // Cooldown
         if (this.currentCooldown > 0) {this.currentCooldown -= deltaTime;}
         if (this.currentCooldown < 0) {this.currentCooldown = 0;}
+        // Ability Cooldowns
+        for (const ability of this.abilities) {
+            if (this.abilityCooldowns[ability] > 0) { this.abilityCooldowns[ability] -= deltaTime; }
+            if (this.abilityCooldowns[ability] < 0) { this.abilityCooldowns[ability] = 0; }
+        }
     }
 }
 
 export class Enemy {
-    constructor(x, y, speed, radius, colour, startHP, damage, cooldown, expDropped) {
+    constructor(x, y, type, speed, radius, colour, startHP, damage, cooldown, expDropped, bulletSpeed) {
         this.x = x;
         this.y = y;
+        this.type = type;
         this.speed = speed;
         this.size = radius;
         this.colour = colour;
@@ -44,7 +52,8 @@ export class Enemy {
         this.damage = damage;
         this.maxCooldown = cooldown;
         this.currentCooldown = cooldown;
-        this.expDropped = expDropped
+        this.expDropped = expDropped;
+        this.bulletSpeed = bulletSpeed;
     }
 
     update(deltaTime, target) {
@@ -53,8 +62,8 @@ export class Enemy {
         const vy = target.y - this.y;
         const distance = Math.sqrt(vx * vx + vy * vy);
         if (distance > 0) {
-            this.x += (vx / distance) * deltaTime * this.speed;
-            this.y += (vy / distance) * deltaTime * this.speed;
+            this.x += (vx / distance) * deltaTime * this.speed + getRandom(-0.5,0.5);
+            this.y += (vy / distance) * deltaTime * this.speed + getRandom(-0.5,0.5);
         }
         // Cooldown
         if (this.currentCooldown != 0) {this.currentCooldown -= deltaTime;}
@@ -63,7 +72,7 @@ export class Enemy {
 }
 
 export class Bullet {
-    constructor(startX, startY, targetX, targetY, speed, colour, radius, damage) {
+    constructor(startX, startY, targetX, targetY, speed, colour, radius, damage, homing, homingTarget) {
         this.x = startX;
         this.y = startY;
         this.speed = speed;
@@ -72,6 +81,9 @@ export class Bullet {
         this.colour = colour;
         this.size = radius;
         this.damage = damage;
+        this.lifetime = 0;
+        this.homing = homing;
+        this.homingTarget = homingTarget;
 
         const dx = targetX - startX;
         const dy = targetY - startY;
@@ -83,10 +95,19 @@ export class Bullet {
     }
 
     update(deltaTime) {
+        if (this.homing && this.lifetime <= 1) {
+            const dx = this.homingTarget.x - this.x;
+            const dy = this.homingTarget.y - this.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            // Prevent division by zero
+            this.vx = distance > 0 ? (dx / distance) * this.speed : 0;
+            this.vy = distance > 0 ? (dy / distance) * this.speed : 0;
+        }
         this.prevX = this.x
         this.prevY = this.y
         this.x += this.vx * deltaTime;
         this.y += this.vy * deltaTime;
+        this.lifetime += deltaTime;
     }
 
     getDistanceToObject(object) {
@@ -104,13 +125,15 @@ export class Bullet {
 }
 
 export class ExperienceOrb {
-    constructor(x,y) {
+    constructor(x,y,uncollectable) {
         this.x = x
         this.y = y
+        this.uncollectable = !!uncollectable
+        this.xpOrbsContained = 1
     }
     update(deltaTime, player) {
         let playerdist = getDistance(this.x,this.y,player.x,player.y);
-        if (playerdist < player.expCatchRange) { return true; }
+        if (playerdist < player.expCatchRange + ((this.xpOrbsContained/4) - 0.25) && !this.uncollectable) { return true; }
         if (playerdist < player.expRange) {
             let vx = player.x - this.x
             let vy = player.y - this.y
@@ -123,6 +146,7 @@ export class ExperienceOrb {
 
 // Functions
 export const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
+export function getRandom(a, b) {return Math.random() * (b - a) + a;}
 
 function getDistance(x1, y1, x2, y2) {
     const dx = x2 - x1;

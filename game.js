@@ -1,17 +1,25 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-import {Bullet, Player, ExperienceOrb, Enemy, clamp} from "./classes.js"
+import {Bullet, Player, ExperienceOrb, Enemy, clamp, getRandom} from "./classes.js"
 import {openUpgradeMenu} from "./upgrade.js"
 import {enemyTypes, enemyData} from "./enemyTypes.js"
 
-function getRandom(a, b) {return Math.random() * (b - a) + a;}
 function getRandomInt(a, b) {return Math.floor(getRandom(a,b))}
 function spawnEnemyType(type, x, y) {
     if (type in enemyData) {
         let eT = enemyData[type]; // short for enemyType
-        Enemies.push(new Enemy(x,y,eT.speed, eT.size, eT.colour, eT.health, eT.damage, eT.cooldown, eT.expDropped));
-    }}
+        for (let i = 1; i <= eT.swarmAmount; i++) {
+            const nx = clamp(x+getRandom(-50,50),0,800)
+            const ny = clamp(y+getRandom(-50,50),0,800)
+            Enemies.push(
+                new Enemy(
+                    nx,ny,type,
+                    eT.speed, eT.size, eT.colour, 
+                    clamp(eT.health*(1+(player.level/100)),0,200), eT.damage, eT.cooldown, 
+                    eT.expDropped, eT.bulletSpeed
+                ));
+}}}
 
 let frameCount = 0;
 let lastTime = 0;
@@ -20,6 +28,13 @@ let prevLevel = 0;
 let wave = 0;
 let waveIntermission = 3
 let waveTimer = 0
+// Get Global MouseX and Y
+let mouseX = 0;
+let mouseY = 0;
+window.addEventListener('mousemove', (event) => {
+    mouseX = event.clientX;
+    mouseY = event.clientY;
+});
 
 const keys = {};
 const PlayerBullets = [];
@@ -29,19 +44,65 @@ const Enemies = [];
 
 function spawnEnemies(amount) {
     for (let index = 1; index <= amount; index++) {
-        spawnEnemyType(enemyTypes[getRandomInt(0, enemyTypes.length)], getRandom(0,800), getRandom(0,800));
+        const availableEnemyTypes = enemyTypes.filter(
+            (type) => player.level >= enemyData[type].minPlayerLvl
+        )
+        spawnEnemyType(availableEnemyTypes[getRandomInt(0, availableEnemyTypes.length)], getRandom(0,800), getRandom(0,800));
     }}
 
+const player = new Player(100,100,150,30,"red",100,5)
 spawnEnemies(1);
-const player = new Player(100,100,150,30,"red",100,10)
-window.game = { player, Enemies }; // Debugging
+window.game = { player, Enemies, ExperienceOrbs, ExperienceOrb, waveIntermission, wave, enemyData }; // Debugging
 
 document.getElementById("restart-button").addEventListener("click", () => {
     window.location.reload();
 });
 
 window.addEventListener("keydown", (event) => {
-    keys[event.key.toLowerCase()] = true;
+    const key = event.key.toLowerCase();
+    if (key === "escape" || key === "`") {
+        if (gameState === "paused") { 
+            gameState = "playing"; 
+            document.getElementById("pause-screen").hidden = true; 
+        } 
+        else if (gameState === "playing") { 
+            gameState = "paused"; 
+            document.getElementById("pause-screen").hidden = false; 
+        }
+    } else if (key === "e" && player.abilities.has("dash") && player.abilityCooldowns["dash"] <= 0) {
+        player.abilityCooldowns["dash"] = 2 // Cooldown
+        // Normalise Vector
+        const rect = canvas.getBoundingClientRect();
+
+        const targetX = (mouseX - rect.left) * (canvas.width / rect.width);
+        const targetY = (mouseY - rect.top) * (canvas.height / rect.height);
+
+        const dirX = targetX - player.x;
+        const dirY = targetY - player.y;
+        const distance = Math.sqrt(dirX*dirX+dirY*dirY);
+        let normX = 0;
+        let normY = 0;
+        if (distance > 0) {
+            normX = dirX / distance;
+            normY = dirY / distance;
+        }
+        // Move
+        player.x += normX * player.speed
+        player.y += normY * player.speed
+
+        if (distance > 0) {
+            normX = dirX / distance;
+            normY = dirY / distance;
+        }
+    } else if (key === "r" && player.abilities.has("teleport") && player.abilityCooldowns["teleport"] <= 0) {
+        player.abilityCooldowns["teleport"] = 15;
+        player.x = getRandom(0,800);
+        player.y = getRandom(0,800);
+    } else if (key === "t" && player.abilities.has("medkit") && player.abilityCooldowns["medkit"] <= 0) {
+        player.abilityCooldowns["medkit"] = 20;
+        player.health += 30
+    }
+    keys[key] = true;
 });
 
 window.addEventListener("keyup", (event) => {
@@ -79,9 +140,53 @@ function update(deltaTime) {
     }
     // Shooting
     for (let x of Enemies) {
+        if (x.type === "Burst") {
+            if ((x.burstShotsRemaining === undefined || x.burstShotsRemaining <= 0) && x.currentCooldown <= 0) {
+                x.currentCooldown = x.maxCooldown;
+                x.burstShotsRemaining = 3;
+                x.burstTimer = 0;
+                x.burstAngle = Math.atan2(player.y - x.y, player.x - x.x);
+            }
+
+            if (x.burstShotsRemaining > 0) {
+                x.burstTimer -= deltaTime;
+
+                if (x.burstTimer <= 0) {
+                    EnemyBullets.push(new Bullet(
+                        x.x, x.y,
+                        x.x + Math.cos(x.burstAngle) * 1000,
+                        x.y + Math.sin(x.burstAngle) * 1000,
+                        x.bulletSpeed, x.colour, x.size / 7, x.damage
+                    ));
+                    x.burstShotsRemaining -= 1;
+                    x.burstTimer = 0.15;
+                }
+            }
+
+            continue;
+        }
+
         if (x.currentCooldown <= 0) {
             x.currentCooldown = x.maxCooldown;
-            EnemyBullets.push(new Bullet(x.x,x.y,player.x,player.y,250,x.colour,x.size/6,x.damage))
+            // Shoot
+            if (x.type === "Shotgun") {
+                const spread = 0.5;
+
+                for (let offset = -1; offset <= 1; offset++) {
+                    const targetX = player.x + offset * spread * 100;
+                    const targetY = player.y;
+
+                    EnemyBullets.push(new Bullet(
+                        x.x, x.y, targetX, targetY,
+                        x.bulletSpeed, x.colour, x.size / 7, x.damage
+                    ));
+                }
+            } else { EnemyBullets.push(new Bullet(x.x,x.y,player.x,player.y,x.bulletSpeed,x.colour,x.size/6,x.damage,(x.type === "Homing"),player)) }
+            // After Shoot
+            if (x.type === "Teleporter") {
+                x.x = getRandom(0,800);
+                x.y = getRandom(0,800);
+            }
         }
     }
     // Collision
@@ -111,23 +216,24 @@ function update(deltaTime) {
     for (let x of [...PlayerBullets, ...EnemyBullets]) {
         x.update(deltaTime);
     }
-    // Delete Bullets if out of Bounding Box
+    // Delete Bullets if out of Bounding Box or if Lifetime is above 20 secs
     // Player
     for (let index = PlayerBullets.length - 1; index >= 0; index--) {
         const bulobj = PlayerBullets[index];
-        if (bulobj.x < -bulobj.size || bulobj.x > 800+bulobj.size || bulobj.y < -bulobj.size || bulobj.y > 800+bulobj.size) {PlayerBullets.splice(index, 1);}
+        if (bulobj.lifetime >= 20 || bulobj.x < -bulobj.size || bulobj.x > 800+bulobj.size || bulobj.y < -bulobj.size || bulobj.y > 800+bulobj.size) {PlayerBullets.splice(index, 1);}
     }
     // Enemy
     for (let index = EnemyBullets.length - 1; index >= 0; index--) {
         const bulobj = EnemyBullets[index];
-        if (bulobj.x < -bulobj.size || bulobj.x > 800+bulobj.size || bulobj.y < -bulobj.size || bulobj.y > 800+bulobj.size) {EnemyBullets.splice(index, 1);}
+        if (bulobj.lifetime >= 20 || bulobj.x < -bulobj.size || bulobj.x > 800+bulobj.size || bulobj.y < -bulobj.size || bulobj.y > 800+bulobj.size) {EnemyBullets.splice(index, 1);}
     }
 
     // Exp Update
+    combineExperienceOrbs();
     for (let index = ExperienceOrbs.length - 1; index >= 0; index--) {
         const orb = ExperienceOrbs[index];
         if (orb.update(deltaTime, player)) {
-            player.level += player.lvlGain;
+            player.level += player.lvlGain * orb.xpOrbsContained;
             ExperienceOrbs.splice(index, 1);
         }
     }
@@ -147,6 +253,7 @@ function update(deltaTime) {
     if (Math.floor(player.lives) <= 0) {dead();}
     // Level up
     if (Math.floor(player.level) > prevLevel) {
+        if (Math.floor(player.level) % 5 === 1) { player.health += 5; }
         gameState = "upgrade";
         openUpgradeMenu(player, () => {
             prevLevel += 1;
@@ -154,7 +261,7 @@ function update(deltaTime) {
         });
     }
     // Enemies Wave Spawn
-    if (Enemies.length == 0) {
+    if (Enemies.length === 0) {
         if (waveTimer >= waveIntermission) {
             waveTimer = 0;
             wave += 1;
@@ -169,6 +276,44 @@ function dead() {
     document.getElementById("death-screen").hidden = false;
 }
 
+function combineExperienceOrbs() {
+    const mergeDistance = 24;
+    const mergeDistanceSquared = mergeDistance * mergeDistance;
+
+    for (let i = 0; i < ExperienceOrbs.length; i++) {
+        const mainOrb = ExperienceOrbs[i];
+
+        for (let j = ExperienceOrbs.length - 1; j > i; j--) {
+            const otherOrb = ExperienceOrbs[j];
+
+            const dx = mainOrb.x - otherOrb.x;
+            const dy = mainOrb.y - otherOrb.y;
+
+            if (dx * dx + dy * dy <= mergeDistanceSquared) {
+                const mainAmount = mainOrb.xpOrbsContained;
+                const otherAmount = otherOrb.xpOrbsContained;
+                const totalAmount = mainAmount + otherAmount;
+
+                // Keep the merged orb centered between both orbs.
+                mainOrb.x =
+                    (mainOrb.x * mainAmount + otherOrb.x * otherAmount) /
+                    totalAmount;
+                mainOrb.y =
+                    (mainOrb.y * mainAmount + otherOrb.y * otherAmount) /
+                    totalAmount;
+
+                mainOrb.xpOrbsContained = totalAmount;
+                ExperienceOrbs.splice(j, 1);
+            }
+        }
+    }
+}
+
+function toSentenceCase(str) {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
 function draw(deltaTime) {
     ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear
     // Text
@@ -180,7 +325,16 @@ function draw(deltaTime) {
     ctx.font = '15px Arial';
     ctx.fillText("HP: " + player.health, 0, 39);
     ctx.fillText("Level: " + (Math.floor(player.level*100))/100, 0, 54);
-    ctx.fillText("Wave: " + wave, 0, 69)
+    ctx.fillText("Wave: " + wave, 0, 69);
+    ctx.fillText("Lives: " + Math.floor(player.lives), 0, 84);
+    let abilityCdY = 99;
+    ctx.font = '10px Arial';
+    for (const ability of player.abilities) {
+        const cooldown = player.abilityCooldowns[ability] ?? 0;
+        const cooldownText = cooldown > 0 ? Math.ceil(cooldown*10)/10 : "Ready";
+        ctx.fillText(`${toSentenceCase(ability)}: ${cooldownText}`, 0, abilityCdY);
+        abilityCdY += 10;
+    }
     // Bullets
     for (let x of [...PlayerBullets, ...EnemyBullets]) {
         ctx.fillStyle = x.colour;
@@ -189,7 +343,7 @@ function draw(deltaTime) {
     // Exp Orbs
     for (let x of ExperienceOrbs) {
         ctx.fillStyle = "#7af3f1"
-        drawCircle(ctx, x.x, x.y, 3);
+        drawCircle(ctx, x.x, x.y, 3 + (x.xpOrbsContained/4) - 0.25);
     }
     // Enemies
     for (let x of Enemies) {
@@ -201,7 +355,7 @@ function draw(deltaTime) {
     drawCircle(ctx, player.x, player.y, player.size);
 }
 
-function drawUpgradeScreen() {
+function drawTransparentBox() {
     ctx.fillStyle = "rgba(0, 0, 0, 0.5)"; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
@@ -220,7 +374,10 @@ function gameLoop(currentTime) {
         draw(deltaTime);
     } else if (gameState === "upgrade") {
         draw(deltaTime);
-        drawUpgradeScreen();
+        drawTransparentBox();
+    } else if (gameState === "paused") {
+        draw(deltaTime);
+        drawTransparentBox();
     }
 
     requestAnimationFrame(gameLoop);

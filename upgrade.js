@@ -28,9 +28,9 @@ const upgrades = [
     },
     {
         name: "Fastest in the West",
-        description: "*0.9 Shooting Cooldown",
+        description: "*0.8 Shooting Cooldown",
         maxLevel: 5,
-        apply(player) {player.maxCooldown *= 0.9;}
+        apply(player) {player.maxCooldown *= 0.8;}
     },
     {
         name: "Live Laugh Life",
@@ -40,9 +40,9 @@ const upgrades = [
     },
     {
         name: "Heavy Bullets",
-        description: "+10 damage",
+        description: "+3 damage",
         maxLevel: 5,
-        apply(player) {player.damage += 10;}
+        apply(player) {player.damage += 3;}
     },
     {
         name: "Experience Rangler",
@@ -67,6 +67,33 @@ const upgrades = [
         description: "+20 exp orb catch range",
         maxLevel: 5,
         apply(player) {player.expCatchRange += 20;}
+    },
+    {
+        name: "Dashing",
+        description: "adds the dashing ability (e)",
+        maxLevel: 1,
+        apply(player) {
+            player.abilities.add("dash");
+            player.abilityCooldowns["dash"] = 5;
+        }
+    },
+    {
+        name: "Espionage",
+        description: "adds the teleport ability (r)",
+        maxLevel: 1, 
+        apply(player) {
+            player.abilities.add("teleport");
+            player.abilityCooldowns["teleport"] = 15;
+        }
+    },
+    {
+        name: "Medkit",
+        description: "adds the medkit ability (t)",
+        maxLevel: 1,
+        apply(player) {
+            player.abilities.add("medkit");
+            player.abilityCooldowns["medkit"] = 20;
+        }
     }
 ];
 
@@ -98,6 +125,7 @@ export function openUpgradeMenu(player, onUpgradeSelected) {
     if (availableUpgrades.length == 0) {
         menu.hidden = true;
         onUpgradeSelected();
+        return;
     }
 
     for (const upgrade of getRandomUpgrades(availableUpgrades, Math.min(3, availableUpgrades.length))) {

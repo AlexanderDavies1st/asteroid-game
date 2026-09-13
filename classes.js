@@ -11,7 +11,7 @@ export class Player {
         this.damage = damage;
         this.bulletSpeed = 150;
         this.bulletSize = radius/6;
-        this.maxCooldown = 0.5;
+        this.maxCooldown = 0.3;
         this.currentCooldown = 0;
         this.lives = 1;
         this.lvlGain = 0.05;

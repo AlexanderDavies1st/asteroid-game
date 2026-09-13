@@ -50,7 +50,7 @@ function spawnEnemies(amount) {
         spawnEnemyType(availableEnemyTypes[getRandomInt(0, availableEnemyTypes.length)], getRandom(0,800), getRandom(0,800));
     }}
 
-const player = new Player(100,100,150,30,"red",100,5)
+const player = new Player(100,100,150,30,"red",100,7)
 spawnEnemies(1);
 window.game = { player, Enemies, ExperienceOrbs, ExperienceOrb, waveIntermission, wave, enemyData }; // Debugging
 
